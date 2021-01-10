@@ -1,11 +1,9 @@
 /**
- * A Token Bucket (https://en.wikipedia.org/wiki/Token_bucket)
+ * Token bucket algorithm.
  */
-
 class TokenBucket {
     private long size = Long.MAX_VALUE;
     TokenBucket() {
-
     }
 
     synchronized long take(long tokens) {

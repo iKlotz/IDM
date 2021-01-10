@@ -60,6 +60,7 @@ public class HTTPRangeGetter implements Runnable {
                         outQueue.put(outChunk);
                     }
                 }
+
                 inputStream.close();
                 connection.disconnect();
             }

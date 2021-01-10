@@ -4,7 +4,7 @@ import java.io.RandomAccessFile;
 import java.util.concurrent.BlockingQueue;
 
 /**
- * This class takes chunks from the queue, writes them to disk and invokes updates to file's metadata.
+ * This class takes chunks from the queue, writes them to the disk and updates the metadata file.
  */
 public class FileWriter implements Runnable {
 
@@ -19,6 +19,7 @@ public class FileWriter implements Runnable {
     private void writeChunks() throws IOException, InterruptedException {
         File file = new File(metadata.getFilename());
         RandomAccessFile writer = new RandomAccessFile(file, "rw");
+
         while (!this.metadata.isCompleted()) {
             try {
                 Chunk chunk = chunkQueue.take();

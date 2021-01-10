@@ -10,10 +10,10 @@ import java.util.List;
 
 /**
  * Describes a file's metadata: URL, file name, size, and which parts already downloaded to disk.
- * <p>
- * The metadata (or at least which parts already downloaded to disk) is constantly stored safely in disk.
- * When constructing a new metadata object, we first check the disk to load existing metadata.
+ * The metadata is constantly stored safely on the disk.
+ * When constructing a new metadata object, we check if there is existing metadata file first.
  */
+
 class DownloadableMetadata {
     private final String metadataFilename;
     private String filename;
@@ -37,6 +37,7 @@ class DownloadableMetadata {
 
     private File getMDF() {
         File mdf = new File(this.metadataFilename);
+
         try {
             File tempMDF = new File(this.metadataFilename + ".tmp");
 
@@ -51,6 +52,7 @@ class DownloadableMetadata {
                     System.exit(-1);
                 }
             }
+
             return mdf;
 
         } catch (IOException e) {
@@ -62,17 +64,15 @@ class DownloadableMetadata {
 
     private void initMDF(File mdf) {
         try {
-
             // initialize metadata file
-            RandomAccessFile ramdf = new RandomAccessFile(mdf, "rw");
+            RandomAccessFile randomAccessMetadataFile = new RandomAccessFile(mdf, "rw");
             StringBuilder stringBuilder = new StringBuilder();
             Long start;
             Long end;
             Long percent;
             percent = this.size / 100;
 
-            // write to metadata file ranges
-            // each range is a percent of the file size, apart from maybe the last
+            // write ranges to metadata
             for (long i = 0; i < 100; i++) {
                 start = i * percent;
                 end = start + percent - 1;
@@ -84,8 +84,8 @@ class DownloadableMetadata {
                 stringBuilder.append(sRange);
             }
 
-            ramdf.writeBytes(stringBuilder.toString());
-            ramdf.close();
+            randomAccessMetadataFile.writeBytes(stringBuilder.toString());
+            randomAccessMetadataFile.close();
 
         } catch (IOException e) {
             System.err.println("Couldn't initiate metadata file :( Download failed.");
@@ -116,7 +116,7 @@ class DownloadableMetadata {
             while ((line = ramdf.readLine()) != null) {
                 separated = line.split(",");
                 range = new Range(Long.parseLong(separated[0]), Long.parseLong(separated[1]));
-                rangeList.add(range);
+                this.rangeList.add(range);
             }
 
             ramdf.close();
@@ -175,6 +175,7 @@ class DownloadableMetadata {
                     stringBuilder.append(sRange);
                 }
             }
+
             ratmp.writeBytes(stringBuilder.toString());
             ratmp.close();
 
@@ -183,12 +184,11 @@ class DownloadableMetadata {
                 Files.move(tempMDF.toPath(), this.mdf.toPath(),
                         StandardCopyOption.REPLACE_EXISTING);
             } catch (IOException e) {
-                System.err.println("Error renaming .tmp file. Download failed.");
-                // try downloading again?
+                System.err.println("Error renaming .tmp file. Download failed :(.");
                 System.exit(-1);
             }
         } catch (IOException e) {
-            System.err.println("Error writing to .tmp file. Download failed.");
+            System.err.println("Error writing to .tmp file. Download failed. Please try again.");
             System.exit(-1);
         }
     }

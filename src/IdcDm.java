@@ -16,7 +16,7 @@ public class IdcDm {
         int numberOfWorkers = 1;
 
         if (args.length < 1 || args.length > 3) {
-            System.err.printf("usage:\n\tjava IdcDm URL [MAX-CONCURRENT-CONNECTIONS]\n");
+            System.err.printf("usage:\n\tjava IdcDm URL | URL-LIST-FILE [MAX-CONCURRENT-CONNECTIONS]\n");
             System.exit(1);
         } else if (args.length >= 2) {
             numberOfWorkers = Integer.parseInt(args[1]);
@@ -25,7 +25,6 @@ public class IdcDm {
         String line = "";
         ArrayList<String> links = new ArrayList<>();
 
-        //get the links, utils?
         try {
             File file = new File(args[0]);
 
@@ -33,40 +32,36 @@ public class IdcDm {
 
                 BufferedReader bufferedReader = new BufferedReader(new FileReader(file));
 
-                while ((line = bufferedReader.readLine()) != null)
-                {
+                while ((line = bufferedReader.readLine()) != null) {
+                    //read the links from the provided file
                     links.add(line);
                 }
                 // close the BufferedReader when we're done
                 bufferedReader.close();
             } else {
+                //if only a single link is provided
                 links.add(args[0]);
             }
-//my debugging
-//            for (String link : links) {
-//                System.out.println(link);
-//            }
-
         } catch (IOException e) {
             e.printStackTrace();
         }
 
 
-        System.err.printf("Downloading");
+        System.err.println("Downloading:");
         if (numberOfWorkers > 1) {
-            System.err.printf(" using %d connections...\n", numberOfWorkers);
+            System.err.printf("Using %d connections...\n", numberOfWorkers);
         }
 
-
-        System.err.printf("Start downloading range ( 0 - %d ) from: ", Utility.getFileSize(links.get(0)));
+        System.err.printf("Start downloading from: \n", Utility.getFileSize(links.get(0)));
         Utility.printLinks(links);
 
         DownloadURL(links, numberOfWorkers);
     }
 
     /**
-     * Initiate metadata file and iterate missing ranges. And pray to good that's the only way to succeed.
-     * @param urls            URL to download
+     * Initiate metadata file and iterate missing ranges. And pray to our lord and savior! (Lucifer, of course...)
+     *
+     * @param urls            URLs to download
      * @param numberOfWorkers number of concurrent connections
      */
     private static void DownloadURL(ArrayList<String> urls, int numberOfWorkers) {
@@ -75,23 +70,25 @@ public class IdcDm {
         DownloadableMetadata metadata = new DownloadableMetadata(urls.get(0));
         FileWriter fileWriter = new FileWriter(metadata, outQueue);
         Thread fileWriterThread = new Thread(fileWriter);
-        ExecutorService executor = Executors.newFixedThreadPool(numberOfWorkers);
+        ExecutorService exec = Executors.newFixedThreadPool(numberOfWorkers);
 
         try {
             fileWriterThread.start();
-            for(int i = 0; i < urls.size(); i++){
+            for (int i = 0; i < urls.size(); i++) {
+                //each worker gets it's own range of the file
                 for (Range range : metadata.getRangeList()) {
                     Runnable worker = new HTTPRangeGetter(urls.get(i), range, outQueue, tokenBucket);
-                    if (i != urls.size() - 1){
+                    if (i != urls.size() - 1) {
                         i++;
                     } else {
                         i = 0;
                     }
-                    executor.execute(worker);
+
+                    exec.execute(worker);
                 }
             }
 
-            executor.shutdown();
+            exec.shutdown();
         } catch (Exception e) {
             System.err.println("Download failed.");
             System.exit(-1);
