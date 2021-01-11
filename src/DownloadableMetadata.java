@@ -116,7 +116,7 @@ class DownloadableMetadata {
             while ((line = ramdf.readLine()) != null) {
                 separated = line.split(",");
                 range = new Range(Long.parseLong(separated[0]), Long.parseLong(separated[1]));
-                rangeList.add(range);
+                this.rangeList.add(range);
             }
 
             ramdf.close();
