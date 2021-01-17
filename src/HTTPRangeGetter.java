@@ -5,28 +5,23 @@ import java.net.URL;
 import java.util.concurrent.BlockingQueue;
 
 /**
- * A runnable class which downloads a given url.
+ * A runnable class which downloads files from a given url.
  * It reads CHUNK_SIZE at a time and writs it into a BlockingQueue.
  * It supports downloading a range of data, and limiting the download rate using a token bucket.
  */
+
 public class HTTPRangeGetter implements Runnable {
-    static final int CHUNK_SIZE = 4096;
+    static final int CHUNK_SIZE = 65536; //64k
     private static final int CONNECT_TIMEOUT = 10000;
     private static final int READ_TIMEOUT = 10000;
     private final String url;
     private final Range range;
     private final BlockingQueue<Chunk> outQueue;
-    private TokenBucket tokenBucket;
 
-    HTTPRangeGetter(
-            String url,
-            Range range,
-            BlockingQueue<Chunk> outQueue,
-            TokenBucket tokenBucket) {
+    HTTPRangeGetter(String url, Range range, BlockingQueue<Chunk> outQueue) {
         this.url = url;
         this.range = range;
         this.outQueue = outQueue;
-        this.tokenBucket = tokenBucket;
     }
 
     private void downloadRange() throws IOException, InterruptedException {
@@ -45,20 +40,18 @@ public class HTTPRangeGetter implements Runnable {
                 long readBytes = 0;
                 long bytesToRead = range.getLength();
                 while (readBytes < bytesToRead) {
-                    if (tokenBucket.take(CHUNK_SIZE) == CHUNK_SIZE) {
-                        byte[] data = new byte[CHUNK_SIZE];
-                        long offset = range.getStart() + readBytes;
-                        int size_in_bytes = inputStream.read(data);
+                    byte[] data = new byte[CHUNK_SIZE];
+                    long offset = range.getStart() + readBytes;
+                    int sizeInBytes = inputStream.read(data); //reads data and returns number of bytes successfully read as an int
 
-                        // check for EOF
-                        if (size_in_bytes == -1) {
-                            break;
-                        }
-
-                        readBytes += size_in_bytes;
-                        Chunk outChunk = new Chunk(data, offset, size_in_bytes, this.range);
-                        outQueue.put(outChunk);
+                    // check for EOF
+                    if (sizeInBytes == -1) {
+                        break;
                     }
+
+                    readBytes += sizeInBytes;
+                    Chunk outChunk = new Chunk(data, offset, sizeInBytes, this.range);
+                    outQueue.put(outChunk);
                 }
 
                 inputStream.close();

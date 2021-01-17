@@ -12,8 +12,7 @@ class Chunk {
     }
 
     byte[] getData() {
-        return data;
-    }
+        return data; }
 
     long getOffset() {
         return offset;

@@ -18,32 +18,27 @@ class DownloadableMetadata {
     private final String metadataFilename;
     private String filename;
     private String url;
-    private File mdf;
+    private File metadataFile;
     private long size;
     private List<Range> rangeList;
     private List<Range> conserverRangeList;
-    private int downloaded;
+    private int downloadedPercentage;
 
     DownloadableMetadata(String url) {
         this.url = url;
         this.filename = getName(url);
-        this.metadataFilename = getMetadataName(filename);
+        this.metadataFilename = getMetadataName(this.filename);
         this.size = contentSize();
-        this.mdf = getMDF();
+        this.metadataFile = getMDF();
         this.rangeList = makeRangeList();
         this.conserverRangeList = new ArrayList(this.rangeList);
-        this.downloaded = 100 - this.rangeList.size();
+        this.downloadedPercentage = 100 - this.rangeList.size();
     }
 
     private File getMDF() {
         File mdf = new File(this.metadataFilename);
 
         try {
-            File tempMDF = new File(this.metadataFilename + ".tmp");
-
-            // delete .tmp file if program crashed before renaming it
-            Files.deleteIfExists(tempMDF.toPath());
-
             if (!mdf.exists()) {
                 if (mdf.createNewFile()) {
                     initMDF(mdf);
@@ -64,7 +59,6 @@ class DownloadableMetadata {
 
     private void initMDF(File mdf) {
         try {
-            // initialize metadata file
             RandomAccessFile randomAccessMetadataFile = new RandomAccessFile(mdf, "rw");
             StringBuilder stringBuilder = new StringBuilder();
             Long start;
@@ -76,6 +70,7 @@ class DownloadableMetadata {
             for (long i = 0; i < 100; i++) {
                 start = i * percent;
                 end = start + percent - 1;
+                //last range can be of different size
                 if (i == 99 && end != this.size) {
                     end = this.size;
                 }
@@ -97,25 +92,28 @@ class DownloadableMetadata {
         try {
             URL url = new URL(this.url);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-
             int res = connection.getResponseCode();
-            return (res / 100 == 2) ? connection.getContentLengthLong() : 0;
 
+            return (res / 100 == 2) ? connection.getContentLengthLong() : 0;
         } catch (IOException e) {
+            System.err.println(e.getMessage());
+
             return 0;
         }
     }
 
     private List<Range> makeRangeList() {
         List<Range> rangeList = new ArrayList<>();
+
         try {
-            RandomAccessFile ramdf = new RandomAccessFile(this.mdf, "rw");
+            RandomAccessFile ramdf = new RandomAccessFile(this.metadataFile, "rw");
             Range range;
             String line;
-            String[] separated;
+            String[] separatedRangeValues;
+
             while ((line = ramdf.readLine()) != null) {
-                separated = line.split(",");
-                range = new Range(Long.parseLong(separated[0]), Long.parseLong(separated[1]));
+                separatedRangeValues = line.split(",");
+                range = new Range(Long.parseLong(separatedRangeValues[0]), Long.parseLong(separatedRangeValues[1]));
                 rangeList.add(range);
             }
 
@@ -137,11 +135,11 @@ class DownloadableMetadata {
         Range newRange = new Range(newStart, newEnd);
 
         if (dist == 1 || dist == 0) {
-            this.downloaded++;
-            System.err.println("Downloaded " + this.downloaded + "%");
+            this.downloadedPercentage++;
+            System.err.println("Downloaded " + this.downloadedPercentage + "%");
         }
 
-        // print download complete message  , delete mdf
+        // print download complete message, delete mdf
         if (this.isCompleted()) {
             System.err.println("Download succeeded");
             this.delete();
@@ -163,7 +161,7 @@ class DownloadableMetadata {
             }
 
             // write current ranges to temp file
-            RandomAccessFile ratmp = new RandomAccessFile(tempMDF, "rw");
+            RandomAccessFile ratmp = new RandomAccessFile(tempMDF, "rw"); //creates a random access stream
             StringBuilder stringBuilder = new StringBuilder();
             for (Range range : this.conserverRangeList) {
                 long start = range.getStart();
@@ -181,8 +179,8 @@ class DownloadableMetadata {
 
             //attempt to rename .tmp file
             try {
-                Files.move(tempMDF.toPath(), this.mdf.toPath(),
-                        StandardCopyOption.REPLACE_EXISTING);
+                Files.move(tempMDF.toPath(), this.metadataFile.toPath(),
+                        StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); //ATOMIC_MOVE ADDED
             } catch (IOException e) {
                 System.err.println("Error renaming .tmp file. Download failed :(.");
                 System.exit(-1);
@@ -198,7 +196,7 @@ class DownloadableMetadata {
     }
 
     boolean isCompleted() {
-        return (this.downloaded == 100);
+        return (this.downloadedPercentage == 100);
     }
 
     public List<Range> getRangeList() {
@@ -214,11 +212,11 @@ class DownloadableMetadata {
     }
 
     private void delete() {
-        if (this.mdf.exists()) {
+        if (this.metadataFile.exists()) {
             System.err.println("Deleting metadata file");
 
             try {
-                Files.delete(this.mdf.toPath());
+                Files.delete(this.metadataFile.toPath());
                 System.err.println("Metadata file deleted");
             } catch (IOException e) {
                 System.err.println("Metadata deletion failed");
